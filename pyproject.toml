@@ -27,3 +27,7 @@ include = ["chatmock*"]
 
 [tool.setuptools.package-data]
 chatmock = ["prompt.md", "prompt_gpt5_codex.md"]
+
+[tool.isort]
+profile = "black"
+skip_gitignore = true                                                                                                                          

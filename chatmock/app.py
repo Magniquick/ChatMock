@@ -4,8 +4,8 @@ from flask import Flask, jsonify
 
 from .config import BASE_INSTRUCTIONS, GPT5_CODEX_INSTRUCTIONS
 from .http import build_cors_headers
-from .routes_openai import openai_bp
 from .routes_ollama import ollama_bp
+from .routes_openai import openai_bp
 
 
 def create_app(

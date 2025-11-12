@@ -70,19 +70,27 @@ def _parse_int(value: Any) -> Optional[int]:
         return None
 
 
-def _parse_window(headers: Mapping[str, Any], used_key: str, window_key: str, reset_key: str) -> Optional[RateLimitWindow]:
+def _parse_window(
+    headers: Mapping[str, Any], used_key: str, window_key: str, reset_key: str
+) -> Optional[RateLimitWindow]:
     used_percent = _parse_float(headers.get(used_key))
     if used_percent is None:
         return None
     window_minutes = _parse_int(headers.get(window_key))
     resets_in_seconds = _parse_int(headers.get(reset_key))
-    return RateLimitWindow(used_percent=used_percent, window_minutes=window_minutes, resets_in_seconds=resets_in_seconds)
+    return RateLimitWindow(
+        used_percent=used_percent,
+        window_minutes=window_minutes,
+        resets_in_seconds=resets_in_seconds,
+    )
 
 
 def parse_rate_limit_headers(headers: Mapping[str, Any]) -> Optional[RateLimitSnapshot]:
     try:
         primary = _parse_window(headers, _PRIMARY_USED, _PRIMARY_WINDOW, _PRIMARY_RESET)
-        secondary = _parse_window(headers, _SECONDARY_USED, _SECONDARY_WINDOW, _SECONDARY_RESET)
+        secondary = _parse_window(
+            headers, _SECONDARY_USED, _SECONDARY_WINDOW, _SECONDARY_RESET
+        )
         if primary is None and secondary is None:
             return None
         return RateLimitSnapshot(primary=primary, secondary=secondary)
@@ -95,7 +103,9 @@ def _limits_path() -> str:
     return os.path.join(home, _LIMITS_FILENAME)
 
 
-def store_rate_limit_snapshot(snapshot: RateLimitSnapshot, captured_at: Optional[datetime] = None) -> None:
+def store_rate_limit_snapshot(
+    snapshot: RateLimitSnapshot, captured_at: Optional[datetime] = None
+) -> None:
     captured = captured_at or datetime.now(timezone.utc)
     try:
         home = get_home_dir()
@@ -175,7 +185,9 @@ def _dict_to_window(value: Any) -> Optional[RateLimitWindow]:
         return None
     window = _parse_int(value.get("window_minutes"))
     resets = _parse_int(value.get("resets_in_seconds"))
-    return RateLimitWindow(used_percent=used, window_minutes=window, resets_in_seconds=resets)
+    return RateLimitWindow(
+        used_percent=used, window_minutes=window, resets_in_seconds=resets
+    )
 
 
 def record_rate_limits_from_response(response: Any) -> None:
@@ -190,11 +202,12 @@ def record_rate_limits_from_response(response: Any) -> None:
     store_rate_limit_snapshot(snapshot)
 
 
-def compute_reset_at(captured_at: datetime, window: RateLimitWindow) -> Optional[datetime]:
+def compute_reset_at(
+    captured_at: datetime, window: RateLimitWindow
+) -> Optional[datetime]:
     if window.resets_in_seconds is None:
         return None
     try:
         return captured_at + timedelta(seconds=int(window.resets_in_seconds))
     except Exception:
         return None
-

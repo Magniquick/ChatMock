@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import sys
-import os
-import webbrowser
 import multiprocessing as mp
+import os
+import sys
+import webbrowser
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -12,8 +12,15 @@ from chatmock.cli import cmd_login
 from chatmock.utils import load_chatgpt_tokens, parse_jwt_claims
 
 
-def run_server(host: str, port: int, reasoning_effort: str = "medium", reasoning_summary: str = "auto") -> None:
-    app = create_app(reasoning_effort=reasoning_effort, reasoning_summary=reasoning_summary)
+def run_server(
+    host: str,
+    port: int,
+    reasoning_effort: str = "medium",
+    reasoning_summary: str = "auto",
+) -> None:
+    app = create_app(
+        reasoning_effort=reasoning_effort, reasoning_summary=reasoning_summary
+    )
     app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)
 
 
@@ -29,7 +36,9 @@ class ServerProcess(QtCore.QObject):
         self._summary = "auto"
 
     def is_running(self) -> bool:
-        return self._proc is not None and self._proc.state() != QtCore.QProcess.NotRunning
+        return (
+            self._proc is not None and self._proc.state() != QtCore.QProcess.NotRunning
+        )
 
     def start(self, host: str, port: int, effort: str, summary: str) -> None:
         if self.is_running():
@@ -40,10 +49,14 @@ class ServerProcess(QtCore.QObject):
         self._proc.setProcessChannelMode(QtCore.QProcess.MergedChannels)
         args = [
             "--run-server",
-            "--host", host,
-            "--port", str(port),
-            "--effort", effort,
-            "--summary", summary,
+            "--host",
+            host,
+            "--port",
+            str(port),
+            "--effort",
+            effort,
+            "--summary",
+            summary,
         ]
         self._proc.start(sys.executable, args)
         self._proc.started.connect(lambda: self.state_changed.emit(True))
@@ -269,7 +282,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.host_edit = QtWidgets.QLineEdit("127.0.0.1")
         self.host_edit.setClearButtonEnabled(True)
         self.host_edit.setMinimumWidth(220)
-        self.host_edit.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.host_edit.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         form.addWidget(self.host_edit, 0, 1)
         form.addWidget(QtWidgets.QLabel("Port"), 0, 2)
         self.port_edit = QtWidgets.QLineEdit("8000")
@@ -320,7 +335,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.baseurl.setTextInteractionFlags(
             QtCore.Qt.TextSelectableByMouse | QtCore.Qt.TextSelectableByKeyboard
         )
-        self.baseurl.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        self.baseurl.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred
+        )
         url_row.addWidget(self.baseurl, 1)
         self.btn_copy = QtWidgets.QPushButton("Copy")
         url_row.addWidget(self.btn_copy)
@@ -366,11 +383,24 @@ class MainWindow(QtWidgets.QMainWindow):
             self.btn_login.setToolTip("You are logged in. Click to re-authenticate.")
             id_claims = parse_jwt_claims(id_token) or {}
             access_claims = parse_jwt_claims(access_token) or {}
-            email = id_claims.get("email") or id_claims.get("preferred_username") or "<unknown>"
-            plan_raw = (access_claims.get("https://api.openai.com/auth") or {}).get("chatgpt_plan_type") or "unknown"
-            plan_map = {"plus": "Plus", "pro": "Pro", "free": "Free", "team": "Team", "enterprise": "Enterprise"}
+            email = (
+                id_claims.get("email")
+                or id_claims.get("preferred_username")
+                or "<unknown>"
+            )
+            plan_raw = (access_claims.get("https://api.openai.com/auth") or {}).get(
+                "chatgpt_plan_type"
+            ) or "unknown"
+            plan_map = {
+                "plus": "Plus",
+                "pro": "Pro",
+                "free": "Free",
+                "team": "Team",
+                "enterprise": "Enterprise",
+            }
             plan = plan_map.get(
-                str(plan_raw).lower(), str(plan_raw).title() if isinstance(plan_raw, str) else "Unknown"
+                str(plan_raw).lower(),
+                str(plan_raw).title() if isinstance(plan_raw, str) else "Unknown",
             )
             self.email_value.setText(email)
             self.plan_value.setText(plan)
@@ -400,13 +430,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _after_login(self, code: int) -> None:
         if code == 0:
-            QtWidgets.QMessageBox.information(self, "Login", "Login successful. You can now start the server.")
+            QtWidgets.QMessageBox.information(
+                self, "Login", "Login successful. You can now start the server."
+            )
         elif code == 13:
             QtWidgets.QMessageBox.warning(
-                self, "Login", "Login helper port is in use. Close other instances and try again."
+                self,
+                "Login",
+                "Login helper port is in use. Close other instances and try again.",
             )
         else:
-            QtWidgets.QMessageBox.critical(self, "Login", "Login failed. Please try again.")
+            QtWidgets.QMessageBox.critical(
+                self, "Login", "Login failed. Please try again."
+            )
         self._refresh_login_state()
 
     def _start_server(self) -> None:
@@ -435,7 +471,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.baseurl.setText(self._server.base_url())
             self.hide()
             self.tray.showMessage(
-                "ChatMock", "Server is running in the background", QtWidgets.QSystemTrayIcon.Information, 1500
+                "ChatMock",
+                "Server is running in the background",
+                QtWidgets.QSystemTrayIcon.Information,
+                1500,
             )
         else:
             self.status.setText("Server stopped")

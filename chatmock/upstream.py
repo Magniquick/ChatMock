@@ -6,11 +6,11 @@ from typing import Any, Dict, List, Tuple
 
 import requests
 from flask import Response, current_app, jsonify, make_response
+from flask import request as flask_request
 
 from .config import CHATGPT_RESPONSES_URL
 from .http import build_cors_headers
 from .session import ensure_session_id
-from flask import request as flask_request
 from .utils import get_effective_chatgpt_auth
 
 
@@ -94,10 +94,18 @@ def start_upstream_request(
 
     responses_payload = {
         "model": model,
-        "instructions": instructions if isinstance(instructions, str) and instructions.strip() else instructions,
+        "instructions": (
+            instructions
+            if isinstance(instructions, str) and instructions.strip()
+            else instructions
+        ),
         "input": input_items,
         "tools": tools or [],
-        "tool_choice": tool_choice if tool_choice in ("auto", "none") or isinstance(tool_choice, dict) else "auto",
+        "tool_choice": (
+            tool_choice
+            if tool_choice in ("auto", "none") or isinstance(tool_choice, dict)
+            else "auto"
+        ),
         "parallel_tool_calls": bool(parallel_tool_calls),
         "store": False,
         "stream": True,
@@ -135,7 +143,10 @@ def start_upstream_request(
             timeout=600,
         )
     except requests.RequestException as e:
-        resp = make_response(jsonify({"error": {"message": f"Upstream ChatGPT request failed: {e}"}}), 502)
+        resp = make_response(
+            jsonify({"error": {"message": f"Upstream ChatGPT request failed: {e}"}}),
+            502,
+        )
         for k, v in build_cors_headers().items():
             resp.headers.setdefault(k, v)
         return None, resp

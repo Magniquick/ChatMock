@@ -41,7 +41,11 @@ def convert_ollama_messages(
         parts: List[Dict[str, Any]] = []
         if isinstance(content, list):
             for p in content:
-                if isinstance(p, dict) and p.get("type") == "text" and isinstance(p.get("text"), str):
+                if (
+                    isinstance(p, dict)
+                    and p.get("type") == "text"
+                    and isinstance(p.get("text"), str)
+                ):
                     parts.append({"type": "text", "text": p.get("text")})
         elif isinstance(content, str):
             parts.append({"type": "text", "text": content})
@@ -73,7 +77,13 @@ def convert_ollama_messages(
                         "type": "function",
                         "function": {
                             "name": name,
-                            "arguments": args if isinstance(args, str) else (json.dumps(args) if isinstance(args, dict) else "{}"),
+                            "arguments": (
+                                args
+                                if isinstance(args, str)
+                                else (
+                                    json.dumps(args) if isinstance(args, dict) else "{}"
+                                )
+                            ),
                         },
                     }
                 )
@@ -106,7 +116,9 @@ def convert_ollama_messages(
         for img in top_images:
             url = to_data_url(img)
             if isinstance(url, str) and url:
-                attach_to["content"].append({"type": "image_url", "image_url": {"url": url}})
+                attach_to["content"].append(
+                    {"type": "image_url", "image_url": {"url": url}}
+                )
     return out
 
 
@@ -128,7 +140,11 @@ def normalize_ollama_tools(tools: List[Dict[str, Any]] | None) -> List[Dict[str,
                     "function": {
                         "name": name,
                         "description": fn.get("description") or "",
-                        "parameters": fn.get("parameters") if isinstance(fn.get("parameters"), dict) else {"type": "object", "properties": {}},
+                        "parameters": (
+                            fn.get("parameters")
+                            if isinstance(fn.get("parameters"), dict)
+                            else {"type": "object", "properties": {}}
+                        ),
                     },
                 }
             )
@@ -146,4 +162,3 @@ def normalize_ollama_tools(tools: List[Dict[str, Any]] | None) -> List[Dict[str,
                 }
             )
     return out
-

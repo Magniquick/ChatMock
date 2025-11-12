@@ -4,7 +4,9 @@ from typing import Any, Dict
 
 
 def build_reasoning_param(
-    base_effort: str = "medium", base_summary: str = "auto", overrides: Dict[str, Any] | None = None
+    base_effort: str = "medium",
+    base_summary: str = "auto",
+    overrides: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     effort = (base_effort or "").strip().lower()
     summary = (base_summary or "").strip().lower()

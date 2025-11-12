@@ -7,9 +7,13 @@ from typing import Any, Dict, List
 from flask import Blueprint, Response, current_app, jsonify, make_response, request
 
 from .config import BASE_INSTRUCTIONS, GPT5_CODEX_INSTRUCTIONS
-from .limits import record_rate_limits_from_response
 from .http import build_cors_headers
-from .reasoning import apply_reasoning_to_message, build_reasoning_param, extract_reasoning_from_model_name
+from .limits import record_rate_limits_from_response
+from .reasoning import (
+    apply_reasoning_to_message,
+    build_reasoning_param,
+    extract_reasoning_from_model_name,
+)
 from .upstream import normalize_model_name, start_upstream_request
 from .utils import (
     convert_chat_messages_to_responses_input,
@@ -17,7 +21,6 @@ from .utils import (
     sse_translate_chat,
     sse_translate_text,
 )
-
 
 openai_bp = Blueprint("openai", __name__)
 
@@ -55,7 +58,9 @@ def _wrap_stream_logging(label: str, iterator, enabled: bool):
 def _instructions_for_model(model: str) -> str:
     base = current_app.config.get("BASE_INSTRUCTIONS", BASE_INSTRUCTIONS)
     if model == "gpt-5-codex":
-        codex = current_app.config.get("GPT5_CODEX_INSTRUCTIONS") or GPT5_CODEX_INSTRUCTIONS
+        codex = (
+            current_app.config.get("GPT5_CODEX_INSTRUCTIONS") or GPT5_CODEX_INSTRUCTIONS
+        )
         if isinstance(codex, str) and codex.strip():
             return codex
     return base
@@ -103,19 +108,34 @@ def chat_completions() -> Response:
         return jsonify(err), 400
 
     if isinstance(messages, list):
-        sys_idx = next((i for i, m in enumerate(messages) if isinstance(m, dict) and m.get("role") == "system"), None)
+        sys_idx = next(
+            (
+                i
+                for i, m in enumerate(messages)
+                if isinstance(m, dict) and m.get("role") == "system"
+            ),
+            None,
+        )
         if isinstance(sys_idx, int):
             sys_msg = messages.pop(sys_idx)
             content = sys_msg.get("content") if isinstance(sys_msg, dict) else ""
             messages.insert(0, {"role": "user", "content": content})
     is_stream = bool(payload.get("stream"))
-    stream_options = payload.get("stream_options") if isinstance(payload.get("stream_options"), dict) else {}
+    stream_options = (
+        payload.get("stream_options")
+        if isinstance(payload.get("stream_options"), dict)
+        else {}
+    )
     include_usage = bool(stream_options.get("include_usage", False))
 
     tools_responses = convert_tools_chat_to_responses(payload.get("tools"))
     tool_choice = payload.get("tool_choice", "auto")
     parallel_tool_calls = bool(payload.get("parallel_tool_calls", False))
-    responses_tools_payload = payload.get("responses_tools") if isinstance(payload.get("responses_tools"), list) else []
+    responses_tools_payload = (
+        payload.get("responses_tools")
+        if isinstance(payload.get("responses_tools"), list)
+        else []
+    )
     extra_tools: List[Dict[str, Any]] = []
     had_responses_tools = False
     if isinstance(responses_tools_payload, list):
@@ -136,18 +156,27 @@ def chat_completions() -> Response:
 
         if not extra_tools and bool(current_app.config.get("DEFAULT_WEB_SEARCH")):
             responses_tool_choice = payload.get("responses_tool_choice")
-            if not (isinstance(responses_tool_choice, str) and responses_tool_choice == "none"):
+            if not (
+                isinstance(responses_tool_choice, str)
+                and responses_tool_choice == "none"
+            ):
                 extra_tools = [{"type": "web_search"}]
 
         if extra_tools:
             import json as _json
+
             MAX_TOOLS_BYTES = 32768
             try:
                 size = len(_json.dumps(extra_tools))
             except Exception:
                 size = 0
             if size > MAX_TOOLS_BYTES:
-                err = {"error": {"message": "responses_tools too large", "code": "RESPONSES_TOOLS_TOO_LARGE"}}
+                err = {
+                    "error": {
+                        "message": "responses_tools too large",
+                        "code": "RESPONSES_TOOLS_TOO_LARGE",
+                    }
+                }
                 if verbose:
                     _log_json("OUT POST /v1/chat/completions", err)
                 return jsonify(err), 400
@@ -155,18 +184,35 @@ def chat_completions() -> Response:
             tools_responses = (tools_responses or []) + extra_tools
 
     responses_tool_choice = payload.get("responses_tool_choice")
-    if isinstance(responses_tool_choice, str) and responses_tool_choice in ("auto", "none"):
+    if isinstance(responses_tool_choice, str) and responses_tool_choice in (
+        "auto",
+        "none",
+    ):
         tool_choice = responses_tool_choice
 
     input_items = convert_chat_messages_to_responses_input(messages)
-    if not input_items and isinstance(payload.get("prompt"), str) and payload.get("prompt").strip():
+    if (
+        not input_items
+        and isinstance(payload.get("prompt"), str)
+        and payload.get("prompt").strip()
+    ):
         input_items = [
-            {"type": "message", "role": "user", "content": [{"type": "input_text", "text": payload.get("prompt")}]}
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": payload.get("prompt")}],
+            }
         ]
 
     model_reasoning = extract_reasoning_from_model_name(requested_model)
-    reasoning_overrides = payload.get("reasoning") if isinstance(payload.get("reasoning"), dict) else model_reasoning
-    reasoning_param = build_reasoning_param(reasoning_effort, reasoning_summary, reasoning_overrides)
+    reasoning_overrides = (
+        payload.get("reasoning")
+        if isinstance(payload.get("reasoning"), dict)
+        else model_reasoning
+    )
+    reasoning_param = build_reasoning_param(
+        reasoning_effort, reasoning_summary, reasoning_overrides
+    )
 
     upstream, error_resp = start_upstream_request(
         model,
@@ -197,12 +243,18 @@ def chat_completions() -> Response:
     if upstream.status_code >= 400:
         try:
             raw = upstream.content
-            err_body = json.loads(raw.decode("utf-8", errors="ignore")) if raw else {"raw": upstream.text}
+            err_body = (
+                json.loads(raw.decode("utf-8", errors="ignore"))
+                if raw
+                else {"raw": upstream.text}
+            )
         except Exception:
             err_body = {"raw": upstream.text}
         if had_responses_tools:
             if verbose:
-                print("[Passthrough] Upstream rejected tools; retrying without extra tools (args redacted)")
+                print(
+                    "[Passthrough] Upstream rejected tools; retrying without extra tools (args redacted)"
+                )
             base_tools_only = convert_tools_chat_to_responses(payload.get("tools"))
             safe_choice = payload.get("tool_choice", "auto")
             upstream2, err2 = start_upstream_request(
@@ -220,17 +272,29 @@ def chat_completions() -> Response:
             else:
                 err = {
                     "error": {
-                        "message": (err_body.get("error", {}) or {}).get("message", "Upstream error"),
+                        "message": (err_body.get("error", {}) or {}).get(
+                            "message", "Upstream error"
+                        ),
                         "code": "RESPONSES_TOOLS_REJECTED",
                     }
                 }
                 if verbose:
                     _log_json("OUT POST /v1/chat/completions", err)
-                return jsonify(err), (upstream2.status_code if upstream2 is not None else upstream.status_code)
+                return jsonify(err), (
+                    upstream2.status_code
+                    if upstream2 is not None
+                    else upstream.status_code
+                )
         else:
             if verbose:
                 print("Upstream error status=", upstream.status_code)
-            err = {"error": {"message": (err_body.get("error", {}) or {}).get("message", "Upstream error")}}
+            err = {
+                "error": {
+                    "message": (err_body.get("error", {}) or {}).get(
+                        "message", "Upstream error"
+                    )
+                }
+            }
             if verbose:
                 _log_json("OUT POST /v1/chat/completions", err)
             return jsonify(err), upstream.status_code
@@ -247,7 +311,9 @@ def chat_completions() -> Response:
             reasoning_compat=reasoning_compat,
             include_usage=include_usage,
         )
-        stream_iter = _wrap_stream_logging("STREAM OUT /v1/chat/completions", stream_iter, verbose)
+        stream_iter = _wrap_stream_logging(
+            "STREAM OUT /v1/chat/completions", stream_iter, verbose
+        )
         resp = Response(
             stream_iter,
             status=upstream.status_code,
@@ -277,14 +343,19 @@ def chat_completions() -> Response:
             return {"prompt_tokens": pt, "completion_tokens": ct, "total_tokens": tt}
         except Exception:
             return None
+
     try:
         for raw in upstream.iter_lines(decode_unicode=False):
             if not raw:
                 continue
-            line = raw.decode("utf-8", errors="ignore") if isinstance(raw, (bytes, bytearray)) else raw
+            line = (
+                raw.decode("utf-8", errors="ignore")
+                if isinstance(raw, (bytes, bytearray))
+                else raw
+            )
             if not line.startswith("data: "):
                 continue
-            data = line[len("data: "):].strip()
+            data = line[len("data: ") :].strip()
             if not data:
                 continue
             if data == "[DONE]":
@@ -297,7 +368,9 @@ def chat_completions() -> Response:
             mu = _extract_usage(evt)
             if mu:
                 usage_obj = mu
-            if isinstance(evt.get("response"), dict) and isinstance(evt["response"].get("id"), str):
+            if isinstance(evt.get("response"), dict) and isinstance(
+                evt["response"].get("id"), str
+            ):
                 response_id = evt["response"].get("id") or response_id
             if kind == "response.output_text.delta":
                 full_text += evt.get("delta") or ""
@@ -311,7 +384,11 @@ def chat_completions() -> Response:
                     call_id = item.get("call_id") or item.get("id") or ""
                     name = item.get("name") or ""
                     args = item.get("arguments") or ""
-                    if isinstance(call_id, str) and isinstance(name, str) and isinstance(args, str):
+                    if (
+                        isinstance(call_id, str)
+                        and isinstance(name, str)
+                        and isinstance(args, str)
+                    ):
                         tool_calls.append(
                             {
                                 "id": call_id,
@@ -320,7 +397,11 @@ def chat_completions() -> Response:
                             }
                         )
             elif kind == "response.failed":
-                error_message = evt.get("response", {}).get("error", {}).get("message", "response.failed")
+                error_message = (
+                    evt.get("response", {})
+                    .get("error", {})
+                    .get("message", "response.failed")
+                )
             elif kind == "response.completed":
                 break
     finally:
@@ -332,10 +413,15 @@ def chat_completions() -> Response:
             resp.headers.setdefault(k, v)
         return resp
 
-    message: Dict[str, Any] = {"role": "assistant", "content": full_text if full_text else None}
+    message: Dict[str, Any] = {
+        "role": "assistant",
+        "content": full_text if full_text else None,
+    }
     if tool_calls:
         message["tool_calls"] = tool_calls
-    message = apply_reasoning_to_message(message, reasoning_summary_text, reasoning_full_text, reasoning_compat)
+    message = apply_reasoning_to_message(
+        message, reasoning_summary_text, reasoning_full_text, reasoning_compat
+    )
     completion = {
         "id": response_id or "chatcmpl",
         "object": "chat.completion",
@@ -388,15 +474,25 @@ def completions() -> Response:
     if not isinstance(prompt, str):
         prompt = payload.get("suffix") or ""
     stream_req = bool(payload.get("stream", False))
-    stream_options = payload.get("stream_options") if isinstance(payload.get("stream_options"), dict) else {}
+    stream_options = (
+        payload.get("stream_options")
+        if isinstance(payload.get("stream_options"), dict)
+        else {}
+    )
     include_usage = bool(stream_options.get("include_usage", False))
 
     messages = [{"role": "user", "content": prompt or ""}]
     input_items = convert_chat_messages_to_responses_input(messages)
 
     model_reasoning = extract_reasoning_from_model_name(requested_model)
-    reasoning_overrides = payload.get("reasoning") if isinstance(payload.get("reasoning"), dict) else model_reasoning
-    reasoning_param = build_reasoning_param(reasoning_effort, reasoning_summary, reasoning_overrides)
+    reasoning_overrides = (
+        payload.get("reasoning")
+        if isinstance(payload.get("reasoning"), dict)
+        else model_reasoning
+    )
+    reasoning_param = build_reasoning_param(
+        reasoning_effort, reasoning_summary, reasoning_overrides
+    )
     upstream, error_resp = start_upstream_request(
         model,
         input_items,
@@ -422,10 +518,20 @@ def completions() -> Response:
     created = int(time.time())
     if upstream.status_code >= 400:
         try:
-            err_body = json.loads(upstream.content.decode("utf-8", errors="ignore")) if upstream.content else {"raw": upstream.text}
+            err_body = (
+                json.loads(upstream.content.decode("utf-8", errors="ignore"))
+                if upstream.content
+                else {"raw": upstream.text}
+            )
         except Exception:
             err_body = {"raw": upstream.text}
-        err = {"error": {"message": (err_body.get("error", {}) or {}).get("message", "Upstream error")}}
+        err = {
+            "error": {
+                "message": (err_body.get("error", {}) or {}).get(
+                    "message", "Upstream error"
+                )
+            }
+        }
         if verbose:
             _log_json("OUT POST /v1/completions", err)
         return jsonify(err), upstream.status_code
@@ -441,7 +547,9 @@ def completions() -> Response:
             vlog=(print if verbose_obfuscation else None),
             include_usage=include_usage,
         )
-        stream_iter = _wrap_stream_logging("STREAM OUT /v1/completions", stream_iter, verbose)
+        stream_iter = _wrap_stream_logging(
+            "STREAM OUT /v1/completions", stream_iter, verbose
+        )
         resp = Response(
             stream_iter,
             status=upstream.status_code,
@@ -455,6 +563,7 @@ def completions() -> Response:
     full_text = ""
     response_id = "cmpl"
     usage_obj: Dict[str, int] | None = None
+
     def _extract_usage(evt: Dict[str, Any]) -> Dict[str, int] | None:
         try:
             usage = (evt.get("response") or {}).get("usage")
@@ -466,14 +575,19 @@ def completions() -> Response:
             return {"prompt_tokens": pt, "completion_tokens": ct, "total_tokens": tt}
         except Exception:
             return None
+
     try:
         for raw_line in upstream.iter_lines(decode_unicode=False):
             if not raw_line:
                 continue
-            line = raw_line.decode("utf-8", errors="ignore") if isinstance(raw_line, (bytes, bytearray)) else raw_line
+            line = (
+                raw_line.decode("utf-8", errors="ignore")
+                if isinstance(raw_line, (bytes, bytearray))
+                else raw_line
+            )
             if not line.startswith("data: "):
                 continue
-            data = line[len("data: "):].strip()
+            data = line[len("data: ") :].strip()
             if not data or data == "[DONE]":
                 if data == "[DONE]":
                     break
@@ -482,7 +596,9 @@ def completions() -> Response:
                 evt = json.loads(data)
             except Exception:
                 continue
-            if isinstance(evt.get("response"), dict) and isinstance(evt["response"].get("id"), str):
+            if isinstance(evt.get("response"), dict) and isinstance(
+                evt["response"].get("id"), str
+            ):
                 response_id = evt["response"].get("id") or response_id
             mu = _extract_usage(evt)
             if mu:

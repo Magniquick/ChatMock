@@ -23,4 +23,3 @@ class AuthBundle:
 class PkceCodes:
     code_verifier: str
     code_challenge: str
-

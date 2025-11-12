@@ -3,13 +3,13 @@ from __future__ import annotations
 import argparse
 import os
 import platform
+import plistlib
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-import plistlib
-from PIL import Image
 
+from PIL import Image
 
 ROOT = Path(__file__).parent.resolve()
 BUILD_DIR = ROOT / "build"
@@ -45,6 +45,7 @@ def rounded(img: Image.Image, radius_ratio: float = 0.22) -> Image.Image:
         return img
     mask = Image.new("L", (w, h), 0)
     from PIL import ImageDraw
+
     d = ImageDraw.Draw(mask)
     d.rounded_rectangle((0, 0, w, h), radius=r, fill=255)
     out = img.copy()
@@ -56,7 +57,9 @@ def make_windows_ico(src_png: Path, out_ico: Path, radius_ratio: float) -> Path:
     info("Generating Windows .ico")
     square = load_icon_png(src_png)
     sizes = [16, 24, 32, 48, 64, 128, 256]
-    images = [rounded(square.resize((s, s), Image.LANCZOS), radius_ratio) for s in sizes]
+    images = [
+        rounded(square.resize((s, s), Image.LANCZOS), radius_ratio) for s in sizes
+    ]
     images[0].save(out_ico, format="ICO", sizes=[(s, s) for s in sizes])
     return out_ico
 
@@ -71,13 +74,13 @@ def make_macos_icns(src_png: Path, out_icns: Path, radius_ratio: float) -> Path:
     square = load_icon_png(src_png)
     sizes = [16, 32, 64, 128, 256, 512, 1024]
     mapping = {
-        16:  ["icon_16x16.png", "icon_32x32.png"],
-        32:  ["icon_16x16@2x.png"],
-        64:  ["icon_32x32@2x.png"],
+        16: ["icon_16x16.png", "icon_32x32.png"],
+        32: ["icon_16x16@2x.png"],
+        64: ["icon_32x32@2x.png"],
         128: ["icon_128x128.png", "icon_256x256.png"],
         256: ["icon_128x128@2x.png"],
         512: ["icon_512x512.png"],
-        1024:["icon_512x512@2x.png"],
+        1024: ["icon_512x512@2x.png"],
     }
     for s in sizes:
         img = rounded(square.resize((s, s), Image.LANCZOS), radius_ratio)
@@ -85,10 +88,14 @@ def make_macos_icns(src_png: Path, out_icns: Path, radius_ratio: float) -> Path:
             img.save(iconset / name, format="PNG")
 
     try:
-        subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(out_icns)], check=True)
+        subprocess.run(
+            ["iconutil", "-c", "icns", str(iconset), "-o", str(out_icns)], check=True
+        )
     except Exception as e:
-        raise RuntimeError("Failed to create .icns. Ensure Xcode command line tools are installed (iconutil).\n"
-                           f"Details: {e}")
+        raise RuntimeError(
+            "Failed to create .icns. Ensure Xcode command line tools are installed (iconutil).\n"
+            f"Details: {e}"
+        )
     finally:
         shutil.rmtree(iconset, ignore_errors=True)
     return out_icns
@@ -99,24 +106,36 @@ def pyinstaller_add_data_arg(src: Path, dest: str) -> str:
     return f"{src}{sep}{dest}"
 
 
-def run_pyinstaller(entry: Path, name: str, icon: Path | None, extra_data: list[tuple[Path, str]], bundle_id: str | None = None) -> None:
+def run_pyinstaller(
+    entry: Path,
+    name: str,
+    icon: Path | None,
+    extra_data: list[tuple[Path, str]],
+    bundle_id: str | None = None,
+) -> None:
     cmd = [
-        sys.executable, "-m", "PyInstaller",
-        "--windowed", "--noconfirm",
-        "--name", name,
+        sys.executable,
+        "-m",
+        "PyInstaller",
+        "--windowed",
+        "--noconfirm",
+        "--name",
+        name,
     ]
     if bundle_id and platform.system().lower() == "darwin":
         cmd += ["--osx-bundle-identifier", bundle_id]
     if icon is not None:
         cmd += ["--icon", str(icon)]
-    for (src, dest) in extra_data:
+    for src, dest in extra_data:
         cmd += ["--add-data", pyinstaller_add_data_arg(src, dest)]
     cmd.append(str(entry))
     info("Running: " + " ".join(cmd))
     subprocess.run(cmd, check=True)
 
 
-def patch_macos_plist(app_path: Path, bundle_id: str, icon_base_name: str = "appicon") -> None:
+def patch_macos_plist(
+    app_path: Path, bundle_id: str, icon_base_name: str = "appicon"
+) -> None:
     info("Patching macOS Info.plist")
     plist_path = app_path / "Contents" / "Info.plist"
     if not plist_path.exists():
@@ -132,6 +151,7 @@ def patch_macos_plist(app_path: Path, bundle_id: str, icon_base_name: str = "app
     with plist_path.open("wb") as f:
         plistlib.dump(data, f)
 
+
 def make_dmg(app_path: Path, dmg_path: Path, volume_name: str) -> None:
     info("Creating DMG")
     staging = BUILD_DIR / "dmg_staging"
@@ -145,13 +165,22 @@ def make_dmg(app_path: Path, dmg_path: Path, volume_name: str) -> None:
     except FileExistsError:
         pass
     dmg_path.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run([
-        "hdiutil", "create", "-volname", volume_name,
-        "-srcfolder", str(staging),
-        "-format", "UDZO",
-        "-imagekey", "zlib-level=9",
-        str(dmg_path)
-    ], check=True)
+    subprocess.run(
+        [
+            "hdiutil",
+            "create",
+            "-volname",
+            volume_name,
+            "-srcfolder",
+            str(staging),
+            "-format",
+            "UDZO",
+            "-imagekey",
+            "zlib-level=9",
+            str(dmg_path),
+        ],
+        check=True,
+    )
     shutil.rmtree(staging, ignore_errors=True)
 
 
@@ -207,7 +236,6 @@ def main() -> None:
             if args.dmg:
                 dmg = ROOT / "dist" / f"{args.name}.dmg"
                 make_dmg(app_path, dmg, args.name)
-
 
 
 if __name__ == "__main__":

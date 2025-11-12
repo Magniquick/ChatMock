@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import errno
 import argparse
+import errno
 import json
 import os
 import sys
@@ -11,9 +11,14 @@ from datetime import datetime
 from .app import create_app
 from .config import CLIENT_ID_DEFAULT
 from .limits import RateLimitWindow, compute_reset_at, load_rate_limit_snapshot
-from .oauth import OAuthHTTPServer, OAuthHandler, REQUIRED_PORT, URL_BASE
-from .utils import eprint, get_home_dir, load_chatgpt_tokens, parse_jwt_claims, read_auth_file
-
+from .oauth import REQUIRED_PORT, URL_BASE, OAuthHandler, OAuthHTTPServer
+from .utils import (
+    eprint,
+    get_home_dir,
+    load_chatgpt_tokens,
+    parse_jwt_claims,
+    read_auth_file,
+)
 
 _STATUS_LIMIT_BAR_SEGMENTS = 30
 _STATUS_LIMIT_BAR_FILLED = "█"
@@ -40,31 +45,35 @@ def _render_progress_bar(percent_used: float) -> str:
     filled_exact = ratio * _STATUS_LIMIT_BAR_SEGMENTS
     filled = int(filled_exact)
     partial = filled_exact - filled
-    
+
     has_partial = partial > 0.5
     if has_partial:
         filled += 1
-    
+
     filled = max(0, min(_STATUS_LIMIT_BAR_SEGMENTS, filled))
     empty = _STATUS_LIMIT_BAR_SEGMENTS - filled
-    
+
     if has_partial and filled > 0:
-        bar = _STATUS_LIMIT_BAR_FILLED * (filled - 1) + _STATUS_LIMIT_BAR_PARTIAL + _STATUS_LIMIT_BAR_EMPTY * empty
+        bar = (
+            _STATUS_LIMIT_BAR_FILLED * (filled - 1)
+            + _STATUS_LIMIT_BAR_PARTIAL
+            + _STATUS_LIMIT_BAR_EMPTY * empty
+        )
     else:
         bar = _STATUS_LIMIT_BAR_FILLED * filled + _STATUS_LIMIT_BAR_EMPTY * empty
-    
+
     return f"[{bar}]"
 
 
 def _get_usage_color(percent_used: float) -> str:
     if percent_used >= 90:
-        return "\033[91m" 
+        return "\033[91m"
     elif percent_used >= 75:
-        return "\033[93m"  
+        return "\033[93m"
     elif percent_used >= 50:
-        return "\033[94m"  
+        return "\033[94m"
     else:
-        return "\033[92m" 
+        return "\033[92m"
 
 
 def _reset_color() -> str:
@@ -133,9 +142,9 @@ def _format_local_datetime(dt: datetime) -> str:
 
 def _print_usage_limits_block() -> None:
     stored = load_rate_limit_snapshot()
-    
+
     print("📊 Usage Limits")
-    
+
     if stored is None:
         print("  No usage data available yet. Send a request through ChatMock first.")
         print()
@@ -159,22 +168,22 @@ def _print_usage_limits_block() -> None:
     for i, (icon_label, desc, window) in enumerate(windows):
         if i > 0:
             print()
-        
+
         percent_used = _clamp_percent(window.used_percent)
         remaining = max(0.0, 100.0 - percent_used)
         color = _get_usage_color(percent_used)
         reset = _reset_color()
-        
+
         progress = _render_progress_bar(percent_used)
         usage_text = f"{percent_used:5.1f}% used"
         remaining_text = f"{remaining:5.1f}% left"
-        
+
         print(f"{icon_label} {desc}")
         print(f"{color}{progress}{reset} {color}{usage_text}{reset} | {remaining_text}")
-        
+
         reset_in = _format_reset_duration(window.resets_in_seconds)
         reset_at = compute_reset_at(stored.captured_at, window)
-        
+
         if reset_in and reset_at:
             reset_at_str = _format_local_datetime(reset_at)
             print(f"    ⏳ Resets in: {reset_in} at {reset_at_str}")
@@ -186,6 +195,7 @@ def _print_usage_limits_block() -> None:
 
     print()
 
+
 def cmd_login(no_browser: bool, verbose: bool) -> int:
     home_dir = get_home_dir()
     client_id = CLIENT_ID_DEFAULT
@@ -195,7 +205,13 @@ def cmd_login(no_browser: bool, verbose: bool) -> int:
 
     try:
         bind_host = os.getenv("CHATGPT_LOCAL_LOGIN_BIND", "127.0.0.1")
-        httpd = OAuthHTTPServer((bind_host, REQUIRED_PORT), OAuthHandler, home_dir=home_dir, client_id=client_id, verbose=verbose)
+        httpd = OAuthHTTPServer(
+            (bind_host, REQUIRED_PORT),
+            OAuthHandler,
+            home_dir=home_dir,
+            client_id=client_id,
+            verbose=verbose,
+        )
     except OSError as e:
         eprint(f"ERROR: {e}")
         if e.errno == errno.EADDRINUSE:
@@ -221,7 +237,7 @@ def cmd_login(no_browser: bool, verbose: bool) -> int:
                 if not line:
                     return
                 try:
-                    from urllib.parse import urlparse, parse_qs
+                    from urllib.parse import parse_qs, urlparse
 
                     parsed = urlparse(line)
                     params = parse_qs(parsed.query)
@@ -287,17 +303,27 @@ def cmd_serve(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="ChatGPT Local: login & OpenAI-compatible proxy")
+    parser = argparse.ArgumentParser(
+        description="ChatGPT Local: login & OpenAI-compatible proxy"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_login = sub.add_parser("login", help="Authorize with ChatGPT and store tokens")
-    p_login.add_argument("--no-browser", action="store_true", help="Do not open the browser automatically")
-    p_login.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+    p_login.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not open the browser automatically",
+    )
+    p_login.add_argument(
+        "--verbose", action="store_true", help="Enable verbose logging"
+    )
 
     p_serve = sub.add_parser("serve", help="Run local OpenAI-compatible server")
     p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=8000)
-    p_serve.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+    p_serve.add_argument(
+        "--verbose", action="store_true", help="Enable verbose logging"
+    )
     p_serve.add_argument(
         "--verbose-obfuscation",
         action="store_true",
@@ -333,7 +359,10 @@ def main() -> None:
     p_serve.add_argument(
         "--expose-reasoning-models",
         action="store_true",
-        default=(os.getenv("CHATGPT_LOCAL_EXPOSE_REASONING_MODELS") or "").strip().lower() in ("1", "true", "yes", "on"),
+        default=(os.getenv("CHATGPT_LOCAL_EXPOSE_REASONING_MODELS") or "")
+        .strip()
+        .lower()
+        in ("1", "true", "yes", "on"),
         help=(
             "Expose gpt-5 reasoning effort variants (minimal|low|medium|high) as separate models from /v1/models. "
             "This allows choosing effort via model selection in compatible UIs."
@@ -342,15 +371,20 @@ def main() -> None:
     p_serve.add_argument(
         "--enable-web-search",
         action=argparse.BooleanOptionalAction,
-        default=(os.getenv("CHATGPT_LOCAL_ENABLE_WEB_SEARCH") or "").strip().lower() in ("1", "true", "yes", "on"),
+        default=(os.getenv("CHATGPT_LOCAL_ENABLE_WEB_SEARCH") or "").strip().lower()
+        in ("1", "true", "yes", "on"),
         help=(
             "Enable default web_search tool when a request omits responses_tools (off by default). "
             "Also configurable via CHATGPT_LOCAL_ENABLE_WEB_SEARCH."
         ),
     )
 
-    p_info = sub.add_parser("info", help="Print current stored tokens and derived account id")
-    p_info.add_argument("--json", action="store_true", help="Output raw auth.json contents")
+    p_info = sub.add_parser(
+        "info", help="Print current stored tokens and derived account id"
+    )
+    p_info.add_argument(
+        "--json", action="store_true", help="Output raw auth.json contents"
+    )
 
     args = parser.parse_args()
 
@@ -388,8 +422,12 @@ def main() -> None:
         id_claims = parse_jwt_claims(id_token) or {}
         access_claims = parse_jwt_claims(access_token) or {}
 
-        email = id_claims.get("email") or id_claims.get("preferred_username") or "<unknown>"
-        plan_raw = (access_claims.get("https://api.openai.com/auth") or {}).get("chatgpt_plan_type") or "unknown"
+        email = (
+            id_claims.get("email") or id_claims.get("preferred_username") or "<unknown>"
+        )
+        plan_raw = (access_claims.get("https://api.openai.com/auth") or {}).get(
+            "chatgpt_plan_type"
+        ) or "unknown"
         plan_map = {
             "plus": "Plus",
             "pro": "Pro",
@@ -397,7 +435,10 @@ def main() -> None:
             "team": "Team",
             "enterprise": "Enterprise",
         }
-        plan = plan_map.get(str(plan_raw).lower(), str(plan_raw).title() if isinstance(plan_raw, str) else "Unknown")
+        plan = plan_map.get(
+            str(plan_raw).lower(),
+            str(plan_raw).title() if isinstance(plan_raw, str) else "Unknown",
+        )
 
         print("👤 Account")
         print("  • Signed in with ChatGPT")

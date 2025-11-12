@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import datetime
-import ssl
 import http.server
 import json
 import secrets
+import ssl
 import threading
 import time
 import urllib.parse
@@ -16,7 +16,6 @@ import certifi
 from .config import OAUTH_ISSUER_DEFAULT
 from .models import AuthBundle, PkceCodes, TokenData
 from .utils import eprint, generate_pkce, parse_jwt_claims, write_auth_file
-
 
 REQUIRED_PORT = 1455
 URL_BASE = f"http://localhost:{REQUIRED_PORT}"
@@ -39,6 +38,7 @@ LOGIN_SUCCESS_HTML = """<!DOCTYPE html>
 """
 
 _SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+
 
 class OAuthHTTPServer(http.server.HTTPServer):
     def __init__(
@@ -120,9 +120,13 @@ class OAuthHTTPServer(http.server.HTTPServer):
         )
 
         last_refresh_str = (
-            datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+            datetime.datetime.now(datetime.timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z")
         )
-        bundle = AuthBundle(api_key=api_key, token_data=token_data, last_refresh=last_refresh_str)
+        bundle = AuthBundle(
+            api_key=api_key, token_data=token_data, last_refresh=last_refresh_str
+        )
         return bundle, success_url or f"{URL_BASE}/success"
 
     def maybe_obtain_api_key(

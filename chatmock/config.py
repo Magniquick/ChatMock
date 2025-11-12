@@ -4,8 +4,9 @@ import os
 import sys
 from pathlib import Path
 
-
-CLIENT_ID_DEFAULT = os.getenv("CHATGPT_LOCAL_CLIENT_ID") or "app_EMoamEEZ73f0CkXaXp7hrann"
+CLIENT_ID_DEFAULT = (
+    os.getenv("CHATGPT_LOCAL_CLIENT_ID") or "app_EMoamEEZ73f0CkXaXp7hrann"
+)
 OAUTH_ISSUER_DEFAULT = os.getenv("CHATGPT_LOCAL_ISSUER") or "https://auth.openai.com"
 OAUTH_TOKEN_URL = f"{OAUTH_ISSUER_DEFAULT}/oauth/token"
 
@@ -16,7 +17,11 @@ def _read_prompt_text(filename: str) -> str | None:
     candidates = [
         Path(__file__).parent.parent / filename,
         Path(__file__).parent / filename,
-        Path(getattr(sys, "_MEIPASS", "")) / filename if getattr(sys, "_MEIPASS", None) else None,
+        (
+            Path(getattr(sys, "_MEIPASS", "")) / filename
+            if getattr(sys, "_MEIPASS", None)
+            else None
+        ),
         Path.cwd() / filename,
     ]
     for candidate in candidates:
@@ -35,7 +40,9 @@ def _read_prompt_text(filename: str) -> str | None:
 def read_base_instructions() -> str:
     content = _read_prompt_text("prompt.md")
     if content is None:
-        raise FileNotFoundError("Failed to read prompt.md; expected adjacent to package or CWD.")
+        raise FileNotFoundError(
+            "Failed to read prompt.md; expected adjacent to package or CWD."
+        )
     return content
 
 
