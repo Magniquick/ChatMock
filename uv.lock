@@ -63,10 +63,9 @@ wheels = [
 
 [[package]]
 name = "chatmock"
-version = "0.1.6"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "blinker" },
     { name = "certifi" },
     { name = "click" },
     { name = "flask" },
@@ -81,7 +80,6 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "blinker", specifier = "==1.9.0" },
     { name = "certifi", specifier = "==2025.8.3" },
     { name = "click", specifier = "==8.2.1" },
     { name = "flask", specifier = "==3.1.1" },

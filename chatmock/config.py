@@ -4,13 +4,17 @@ import os
 import sys
 from pathlib import Path
 
-CLIENT_ID_DEFAULT = (
-    os.getenv("CHATGPT_LOCAL_CLIENT_ID") or "app_EMoamEEZ73f0CkXaXp7hrann"
+from .constants import (
+    DEFAULT_CHATGPT_RESPONSES_URL,
+    DEFAULT_CLIENT_ID,
+    DEFAULT_OAUTH_ISSUER,
 )
-OAUTH_ISSUER_DEFAULT = os.getenv("CHATGPT_LOCAL_ISSUER") or "https://auth.openai.com"
+
+CLIENT_ID_DEFAULT = os.getenv("CHATGPT_LOCAL_CLIENT_ID") or DEFAULT_CLIENT_ID
+OAUTH_ISSUER_DEFAULT = os.getenv("CHATGPT_LOCAL_ISSUER") or DEFAULT_OAUTH_ISSUER
 OAUTH_TOKEN_URL = f"{OAUTH_ISSUER_DEFAULT}/oauth/token"
 
-CHATGPT_RESPONSES_URL = "https://chatgpt.com/backend-api/codex/responses"
+CHATGPT_RESPONSES_URL = DEFAULT_CHATGPT_RESPONSES_URL
 
 
 def _read_prompt_text(filename: str) -> str | None:
